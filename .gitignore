@@ -1,0 +1,27 @@
+# Build output
+bin/
+obj/
+
+# User-specific files
+*.user
+*.suo
+.vs/
+
+# dotnet user secrets
+secrets.json
+
+# Environment / local overrides
+.env
+.env.local
+
+# Rider
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test results
+TestResults/
+coverage/
+*.trx

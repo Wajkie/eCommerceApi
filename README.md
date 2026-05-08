@@ -221,6 +221,32 @@ All errors return RFC 9457 `ProblemDetails`:
 
 The `title` field carries a machine-readable error code (`NOT_FOUND`, `BAD_REQUEST`, `INTERNAL_ERROR`). Controllers have zero catch blocks — domain exceptions propagate to `GlobalExceptionHandler`.
 
+## Roadmap
+
+The platform is functional but not yet production-hardened for horizontal scaling. The following are planned and architecturally accounted for — the swap points are already isolated in the codebase.
+
+### Redis (not implemented)
+
+**Session and cache distribution**
+Currently `IMemoryCache` is used for store lookups and output caching. This works on a single instance but breaks under a load balancer. The plan is to swap to `IDistributedCache` (StackExchange.Redis) with a managed provider (Upstash, Redis Cloud, etc.). The cache layer is already abstracted behind interfaces, so this is a targeted swap with no controller or service changes.
+
+**Webhook retry persistence**
+Pending webhook retries live in `Channel<WebhookEvent>` (in-memory). A process restart loses any queued events. The fix is a Redis-backed queue with a polling service that survives restarts and can be spread across instances. The `WebhookDispatchService` is already a singleton hosted service — the channel swap is self-contained.
+
+### Structured logging (not implemented)
+
+Default `Microsoft.Extensions.Logging` is in place. Serilog with an appropriate sink (disk, database, or cloud logging) will be added once the deployment target is decided — the sink choice is a deployment concern, not a code concern.
+
+### Store frontend template (not implemented)
+
+The `WebhookUrl` and `JwksUri` fields on store onboarding require a deployable store frontend to be meaningful. A Vite + React store template is planned, intended for one-click deploy to Netlify or similar. This unblocks real end-to-end onboarding flows.
+
+### API versioning (not implemented)
+
+No `v1/v2` prefix on routes today. Will be introduced when the first breaking change requires it.
+
+---
+
 ## Tests
 
 ```powershell

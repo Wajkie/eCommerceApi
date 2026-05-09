@@ -43,15 +43,6 @@ namespace eCommerceApi.Middleware
                 return;
             }
 
-            // Require X-Api-Key on every request
-            if (!context.Request.Headers.TryGetValue("X-Api-Key", out var rawKey) || string.IsNullOrEmpty(rawKey))
-            {
-                _logger.LogWarning("Request to {Path} rejected: missing X-Api-Key for store {StoreId}", path, storeId);
-                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                await context.Response.WriteAsJsonAsync(new { error = "Missing X-Api-Key header." });
-                return;
-            }
-
             // Load store (hits in-memory cache in TenantService, DB only on first miss)
             var store = tenantService.GetCurrentStoreInfo();
             if (store == null)
@@ -62,14 +53,33 @@ namespace eCommerceApi.Middleware
                 return;
             }
 
-            // Hash the incoming key and compare — timing-safe, constant time
-            var incomingHash = ApiKeyHasher.Hash(rawKey!, _apiKeySecret);
-            if (!TimingSafeEquals(store.ApiKeyHash, incomingHash))
+            // Read-only requests and customer self-registration are public — no API key needed.
+            // All other write operations require X-Api-Key (sent server-side via Netlify Function proxy).
+            var isPublicWrite = HttpMethods.IsPost(context.Request.Method)
+                             && path.StartsWithSegments("/api/Customers");
+
+            var isReadOnly = HttpMethods.IsGet(context.Request.Method)
+                          || HttpMethods.IsHead(context.Request.Method)
+                          || HttpMethods.IsOptions(context.Request.Method);
+
+            if (!isReadOnly && !isPublicWrite)
             {
-                _logger.LogWarning("Request to {Path} rejected: invalid API key for store {StoreId} from {Ip}", path, storeId, context.Connection.RemoteIpAddress);
-                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                await context.Response.WriteAsJsonAsync(new { error = "Invalid API key." });
-                return;
+                if (!context.Request.Headers.TryGetValue("X-Api-Key", out var rawKey) || string.IsNullOrEmpty(rawKey))
+                {
+                    _logger.LogWarning("Request to {Path} rejected: missing X-Api-Key for store {StoreId}", path, storeId);
+                    context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    await context.Response.WriteAsJsonAsync(new { error = "Missing X-Api-Key header." });
+                    return;
+                }
+
+                var incomingHash = ApiKeyHasher.Hash(rawKey!, _apiKeySecret);
+                if (!TimingSafeEquals(store.ApiKeyHash, incomingHash))
+                {
+                    _logger.LogWarning("Request to {Path} rejected: invalid API key for store {StoreId} from {Ip}", path, storeId, context.Connection.RemoteIpAddress);
+                    context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    await context.Response.WriteAsJsonAsync(new { error = "Invalid API key." });
+                    return;
+                }
             }
 
             await metricsQueue.EnqueueAsync(storeId.Value, context.RequestAborted);

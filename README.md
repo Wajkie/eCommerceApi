@@ -233,6 +233,9 @@ Currently `IMemoryCache` is used for store lookups and output caching. This work
 **Webhook retry persistence**
 Pending webhook retries live in `Channel<WebhookEvent>` (in-memory). A process restart loses any queued events. The fix is a Redis-backed queue with a polling service that survives restarts and can be spread across instances. The `WebhookDispatchService` is already a singleton hosted service — the channel swap is self-contained.
 
+**Cart stock reservation**
+When two customers race to buy the last unit of a product, the current flow only rejects at order creation time — by then, the losing customer has already filled in a checkout form. The right fix is a short-lived Redis reservation: when a product is added to a cart, a TTL key (`reserve:{storeId}:{externalId}`) decrements the available counter atomically. The product catalog and cart UI read from this counter so items appear unavailable before anyone reaches checkout. Reservations expire automatically (e.g. 15 min) if the cart is abandoned, releasing stock back to the pool. This requires a Redis connection from the store frontend (Upstash HTTP API is a good fit for edge/serverless environments) and a small reservation Netlify Function. The API's final stock check at `POST /api/Orders` remains as the authoritative guard.
+
 ### Structured logging (not implemented)
 
 Default `Microsoft.Extensions.Logging` is in place. Serilog with an appropriate sink (disk, database, or cloud logging) will be added once the deployment target is decided — the sink choice is a deployment concern, not a code concern.

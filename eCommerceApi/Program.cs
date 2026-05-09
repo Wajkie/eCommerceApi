@@ -46,10 +46,16 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddMemoryCache();
 
 // Add Output Caching for Catalog endpoints (varies by Store)
-builder.Services.AddOutputCache(options => 
+builder.Services.AddOutputCache(options =>
 {
-    options.AddBasePolicy(builder => 
-        builder.Expire(TimeSpan.FromMinutes(1)).SetVaryByHeader("X-Store-Id"));
+    options.AddBasePolicy(b =>
+        b.Expire(TimeSpan.FromMinutes(1)).SetVaryByHeader("X-Store-Id"));
+
+    options.AddPolicy("StoreProducts", b =>
+        b.Expire(TimeSpan.FromMinutes(1))
+         .SetVaryByHeader("X-Store-Id")
+         .SetVaryByQuery("page", "pageSize", "externalId", "search")
+         .Tag("store-products"));
 });
 
 // Add Rate Limiting to prevent brute force

@@ -11,18 +11,18 @@ namespace eCommerceApi.Controllers
     public class ProductsController : ControllerBase
     {
         private readonly IProductService _productService;
+        private readonly IOutputCacheStore _cacheStore;
         private readonly ILogger<ProductsController> _logger;
 
-        public ProductsController(IProductService productService, ILogger<ProductsController> logger)
+        public ProductsController(IProductService productService, IOutputCacheStore cacheStore, ILogger<ProductsController> logger)
         {
             _productService = productService;
+            _cacheStore = cacheStore;
             _logger = logger;
         }
 
         [HttpGet]
-        [OutputCache(Duration = 60,
-            VaryByHeaderNames = new[] { "X-Store-Id" },
-            VaryByQueryKeys = new[] { "externalId", "page", "pageSize" })]
+        [OutputCache(PolicyName = "StoreProducts")]
         public async Task<ActionResult<PaginatedResponseDto<ProductDto>>> GetProducts([FromQuery] ProductQueryParameters queryParameters)
         {
             var paginatedResult = await _productService.GetProductsAsync(queryParameters);
@@ -54,6 +54,7 @@ namespace eCommerceApi.Controllers
                 return BadRequest(new { error = "At least one product is required." });
 
             var created = await _productService.BulkRegisterAsync(items);
+            await _cacheStore.EvictByTagAsync("store-products", HttpContext.RequestAborted);
             return Ok(created.Select(MapToDto));
         }
 
@@ -64,6 +65,7 @@ namespace eCommerceApi.Controllers
             if (!result)
                 return NotFound(new { error = $"Product {id} not found." });
 
+            await _cacheStore.EvictByTagAsync("store-products", HttpContext.RequestAborted);
             return NoContent();
         }
 

@@ -3,7 +3,7 @@
 Multi-tenant e-commerce REST API built with ASP.NET Core (.NET 10). Designed to serve any store at any scale — from a developer managing ten small shops to a retailer running a high-traffic global operation — without changing a line of platform code.
 
 Each store is a fully isolated tenant with its own API key, data scope, webhook endpoint, and optional identity provider. The platform handles the infrastructure; stores plug in their own auth and receive events over webhooks.
-
+[Store template](https://wajkiestoretemplate.netlify.app/)
 ## Stack
 
 - **ASP.NET Core (.NET 10)** — REST API
